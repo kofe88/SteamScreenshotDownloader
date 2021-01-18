@@ -172,15 +172,14 @@ namespace SteamScreenshotDownloader {
             MatchCollection fileIdMatches;
             var retries = 10;
 
-            do
-            {
+            do {
                 GC.Collect();
                 var webRequest = WebRequest.Create(url) as HttpWebRequest;
                 var response = webRequest?.GetResponse();
                 // TODO: Handle null responses...
                 var stream = response?.GetResponseStream();
                 var streamReader = new StreamReader(stream ?? throw new InvalidOperationException());
-                var html = streamReader?.ReadToEnd();
+                var html = streamReader.ReadToEnd();
                 fileIdMatches = Regex.Matches(html, fileDetailPattern, RegexOptions.IgnoreCase);
                 retries--;
             } while (fileIdMatches.Count == 0 && retries > 0);
