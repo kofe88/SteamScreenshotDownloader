@@ -1,7 +1,7 @@
 # Steam Screenshot Downloader
 A Windows console application that downloads all screenshots &amp; thumbnails for the specified Steam account.
 
-![01](https://i.loli.net/2021/01/19/uq5XLCiraDbJHY9.png)
-![02](https://i.loli.net/2021/01/19/tlM3KHuiPdOCXvr.png)
-![03](https://i.loli.net/2021/01/19/54qnEHSL3KPusUM.png)
-![04](https://i.loli.net/2021/01/19/65baSk1JsQKFORI.png)
+![1.png](https://i.loli.net/2021/01/19/nxM8oDmlcbdpKQV.png)
+![3.png](https://i.loli.net/2021/01/19/cYB9UTsVkXSWqvy.png)
+![2.png](https://i.loli.net/2021/01/19/jLiPYUkfOdrxbo2.png)
+![4.png](https://i.loli.net/2021/01/19/TX2UHwrQdjLEbsu.png)
