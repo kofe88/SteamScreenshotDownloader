@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -23,24 +24,34 @@ namespace SteamScreenshotDownloader {
         private static string BaseDirectory { get; set; }
 
         private static void Main() {
-            BaseDirectory = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? throw new InvalidOperationException(), "FromSteam");
+            BaseDirectory = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? throw new InvalidOperationException(), "Steam");
 
             Console.Write("Enter Steam ID: ");
             var steamId = Console.ReadLine();
 
             var screenshots = GetFileIdAndThumbnails(new List<SteamScreenshot>(), steamId, 1);
 
+            var index = 1;
+            var total = screenshots.Count();
+
+            Console.WriteLine("\nFinding screenshots' url...");
             foreach (var screenshot in screenshots) {
+                Console.Write("[" + index + "/" + total + "] ");
                 var fullscreenUrl = GetFileActualUrl(screenshot.FileId);
 
                 if (!string.IsNullOrWhiteSpace(fullscreenUrl)) {
                     screenshot.ScreenshotUrl = fullscreenUrl;
                 }
+                index++;
             }
 
+            Console.WriteLine("\nStart Saving...");
+            Console.WriteLine("Saving to {0}", BaseDirectory);
             SaveScreenshots(screenshots);
 
-            Console.WriteLine("Done! Processed {0} screenshots, press any key to exit.", screenshots.Count);
+            Process.Start(BaseDirectory);
+            Console.WriteLine("\nDone! Processed {0} screenshots.", total);
+            Console.WriteLine("Press any key to exit.");
             Console.Read();
         }
 
@@ -65,7 +76,10 @@ namespace SteamScreenshotDownloader {
 
         private static void SaveScreenshots(IEnumerable<SteamScreenshot> screenshots) {
             const string dispositionPattern = @"inline; filename(?:\*\=UTF-8'')(?<Filename>.*?);|inline; filename=""(?<Filename>.*?)"";";
-
+            var index = 1;
+            // ReSharper disable once PossibleMultipleEnumeration
+            var total = screenshots.Count();
+            // ReSharper disable once PossibleMultipleEnumeration
             foreach (var screenshot in screenshots) {
                 if (string.IsNullOrWhiteSpace(screenshot.ScreenshotUrl)) {
                     Console.ForegroundColor = ConsoleColor.Red;
@@ -93,7 +107,7 @@ namespace SteamScreenshotDownloader {
                                 fullFilename = fullFilename.Replace("screenshots", "");
                                 var lastSlash = fullFilename.LastIndexOf('\\');
                                 fullFilename = fullFilename.Substring(0, lastSlash - 1);
-                                screenshot.ScreenshotFilename = fullFilename + @"\\" + screenshot.FileId + ".jpg";
+                                screenshot.ScreenshotFilename = fullFilename + @"\" + screenshot.FileId + ".jpg";
                             } else {
                                 screenshot.ScreenshotFilename = screenshot.FileId + ".jpg";
                             }
@@ -111,9 +125,11 @@ namespace SteamScreenshotDownloader {
                         }
 
                         using (var fileStream = new FileStream(fullScreenshotFilePath, FileMode.Create)) {
-                            Console.WriteLine("Saving screenshot to {0}", fullScreenshotFilePath);
+                            Console.WriteLine("[" + index + "/" + total + "] Saving screenshot {0}", screenshot.FileId);
                             stream?.CopyTo(fileStream);
                         }
+
+                        index++;
                     }
                 }
 
@@ -164,7 +180,6 @@ namespace SteamScreenshotDownloader {
         }
 
         private static List<SteamScreenshot> GetFileIdAndThumbnails(List<SteamScreenshot> screenshots, string steamId, int pageNo) {
-            Console.WriteLine("Getting file ids and thumbnails for {0}, page {1}", steamId, pageNo);
             var requestScreenshots = new List<SteamScreenshot>();
 
             const string fileDetailPattern = "<div style=\\\"background-image: url\\('(?<ThumbnailUrl>.*?)'\\);\\\" class=\\\"imgWallItem.*?\\\" id=\\\"imgWallItem_(?<FileId>\\d{1,})\\\"";
@@ -184,22 +199,24 @@ namespace SteamScreenshotDownloader {
                 retries--;
             } while (fileIdMatches.Count == 0 && retries > 0);
 
+            Console.WriteLine("\nGetting file ids for {0}, page {1}", steamId, pageNo);
+
             for (var i = 0; i < fileIdMatches.Count; i++) {
                 var match = fileIdMatches[i];
                 var fileIdValue = double.Parse(match.Groups["FileId"].Value.Trim());
-                var thumbnailUrlValue = match.Groups["ThumbnailUrl"].Value.Trim();
-                var newScreenshot = new SteamScreenshot { FileId = fileIdValue, ThumbnailUrl = thumbnailUrlValue };
+                var newScreenshot = new SteamScreenshot { FileId = fileIdValue };
 
-                Console.WriteLine("Added File Id: {0}, with Thumbnail Url: {1}", newScreenshot.FileId,
-                    newScreenshot.ThumbnailUrl);
+                Console.WriteLine("Added File Id: {0}", newScreenshot.FileId);
 
                 requestScreenshots.Add(newScreenshot);
             }
 
-
-            if (!requestScreenshots.Any()) return screenshots;
-            screenshots.AddRange(requestScreenshots);
-            GetFileIdAndThumbnails(screenshots, steamId, pageNo + 1);
+            if (requestScreenshots.Any()) {
+                screenshots.AddRange(requestScreenshots);
+                GetFileIdAndThumbnails(screenshots, steamId, pageNo + 1);
+                return screenshots;
+            }
+            Console.WriteLine("[No more screenshot found.]");
             return screenshots;
         }
 
@@ -224,7 +241,7 @@ namespace SteamScreenshotDownloader {
                     var match = actualFileUrlMatches[1];
                     var value = match.Value.Replace("href=", "").Replace("\"", "").Trim();
 
-                    Console.WriteLine("Found screenshot url {0} for File Id: {1}", value, fileId);
+                    Console.WriteLine("Found screenshot url for File Id: {0}", fileId);
 
                     return value;
                 }
