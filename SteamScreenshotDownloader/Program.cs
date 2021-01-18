@@ -33,10 +33,11 @@ namespace SteamScreenshotDownloader {
 
             var index = 1;
             var total = screenshots.Count();
+            var digit = Math.Abs(total).ToString().Length;
 
             Console.WriteLine("\nFinding screenshots' url...");
             foreach (var screenshot in screenshots) {
-                Console.Write("[" + index + "/" + total + "] ");
+                Console.Write("[" + index.ToString().PadLeft(digit, '0') + "/" + total + "] ");
                 var fullscreenUrl = GetFileActualUrl(screenshot.FileId);
 
                 if (!string.IsNullOrWhiteSpace(fullscreenUrl)) {
@@ -79,6 +80,7 @@ namespace SteamScreenshotDownloader {
             var index = 1;
             // ReSharper disable once PossibleMultipleEnumeration
             var total = screenshots.Count();
+            var digit = Math.Abs(total).ToString().Length;
             // ReSharper disable once PossibleMultipleEnumeration
             foreach (var screenshot in screenshots) {
                 if (string.IsNullOrWhiteSpace(screenshot.ScreenshotUrl)) {
@@ -125,7 +127,7 @@ namespace SteamScreenshotDownloader {
                         }
 
                         using (var fileStream = new FileStream(fullScreenshotFilePath, FileMode.Create)) {
-                            Console.WriteLine("[" + index + "/" + total + "] Saving screenshot {0}", screenshot.FileId);
+                            Console.WriteLine("[" + index.ToString().PadLeft(digit, '0') + "/" + total + "] Saving screenshot {0}", screenshot.FileId);
                             stream?.CopyTo(fileStream);
                         }
 
