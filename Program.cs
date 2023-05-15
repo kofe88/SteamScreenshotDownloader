@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
+﻿using System.Diagnostics;
 using System.Net;
 using System.Reflection;
 using System.Text.RegularExpressions;
@@ -11,53 +7,55 @@ namespace SteamScreenshotDownloader {
     public class SteamScreenshot {
         public double FileId { get; set; }
 
-        public string ScreenshotFilename { get; set; }
+        public string? ScreenshotFilename { get; set; }
 
-        public string ScreenshotUrl { get; set; }
+        public string? ScreenshotUrl { get; set; }
 
         //public string ThumbnailFilename { get; set; }
-
-        public string ThumbnailUrl { get; set; }
     }
 
     internal static class Program {
-        private static string BaseDirectory { get; set; }
+        private static string? BaseDirectory { get; set; }
 
+        [Obsolete("Obsolete")]
         private static void Main() {
-            BaseDirectory = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? throw new InvalidOperationException(), "Steam");
-
             Console.Write("Enter Steam ID: ");
             var steamId = Console.ReadLine();
 
-            var screenshots = GetFileIdAndThumbnails(new List<SteamScreenshot>(), steamId, 1);
+            if (steamId != null) {
+                var screenshots = GetFileIdAndThumbnails(new List<SteamScreenshot>(), steamId, 1);
 
-            var index = 1;
-            var total = screenshots.Count();
-            var digit = Math.Abs(total).ToString().Length;
+                var index = 1;
+                var total = screenshots.Count;
+                var digit = Math.Abs(total).ToString().Length;
 
-            Console.WriteLine("\nFinding screenshots' url...");
-            foreach (var screenshot in screenshots) {
-                Console.Write("[" + index.ToString().PadLeft(digit, '0') + "/" + total + "] ");
-                var fullscreenUrl = GetFileActualUrl(screenshot.FileId);
+                Console.WriteLine("\nFinding screenshots' url...");
+                foreach (var screenshot in screenshots) {
+                    Console.Write("[" + index.ToString().PadLeft(digit, '0') + "/" + total + "] ");
+                    var fullscreenUrl = GetFileActualUrl(screenshot.FileId);
 
-                if (!string.IsNullOrWhiteSpace(fullscreenUrl)) {
-                    screenshot.ScreenshotUrl = fullscreenUrl;
+                    if (!string.IsNullOrWhiteSpace(fullscreenUrl)) {
+                        screenshot.ScreenshotUrl = fullscreenUrl;
+                    }
+                    index++;
                 }
-                index++;
+
+                BaseDirectory = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? throw new InvalidOperationException(), steamId);
+
+                Console.WriteLine("\nStart Saving...");
+                Console.WriteLine("Saving to {0}", BaseDirectory);
+                SaveScreenshots(screenshots);
+
+                //Process.Start(BaseDirectory);
+                Console.WriteLine("\nDone! Processed {0} screenshots.", total);
             }
 
-            Console.WriteLine("\nStart Saving...");
-            Console.WriteLine("Saving to {0}", BaseDirectory);
-            SaveScreenshots(screenshots);
-
-            Process.Start(BaseDirectory);
-            Console.WriteLine("\nDone! Processed {0} screenshots.", total);
             Console.WriteLine("Press any key to exit.");
             Console.Read();
         }
 
         private static WebResponse TryGetResponse(WebRequest request, int maxRetries = 10, int retryWaitSeconds = 3) {
-            WebResponse result = null;
+            WebResponse result = null!;
             var tries = 0;
 
             do {
@@ -69,12 +67,15 @@ namespace SteamScreenshotDownloader {
                     Console.WriteLine("Web request error, attempt {0}", tries);
                     Console.ResetColor();
 
-                    System.Threading.Thread.Sleep(retryWaitSeconds * 1000);
+                    Thread.Sleep(retryWaitSeconds * 1000);
                 }
             } while (result == null && tries <= maxRetries);
+
+            Debug.Assert(result != null, nameof(result) + " != null");
             return result;
         }
 
+        [Obsolete("Obsolete")]
         private static void SaveScreenshots(IEnumerable<SteamScreenshot> screenshots) {
             const string dispositionPattern = @"inline; filename(?:\*\=UTF-8'')(?<Filename>.*?);|inline; filename=""(?<Filename>.*?)"";";
             var index = 1;
@@ -90,14 +91,12 @@ namespace SteamScreenshotDownloader {
                     continue;
                 }
 
-                var screenshotWebRequest = WebRequest.Create(screenshot.ScreenshotUrl) as HttpWebRequest;
-
-                using (var response = TryGetResponse(screenshotWebRequest)) {
-                    // TODO: Handle null responses...
-                    if (response == null) continue;
-                    using (var stream = response.GetResponseStream()) {
-                        if (response.Headers.AllKeys.Any(x => x.Equals("Content-Disposition", StringComparison.OrdinalIgnoreCase))) {
-                            var fullDisposition = response.Headers["Content-Disposition"];
+                if (WebRequest.Create(screenshot.ScreenshotUrl) is HttpWebRequest screenshotWebRequest) {
+                    using var response = TryGetResponse(screenshotWebRequest);
+                    using var stream = response.GetResponseStream();
+                    if (response.Headers.AllKeys.Any(x => x.Equals("Content-Disposition", StringComparison.OrdinalIgnoreCase))) {
+                        var fullDisposition = response.Headers["Content-Disposition"];
+                        if (fullDisposition != null) {
                             var regexMatch = Regex.Match(fullDisposition, dispositionPattern);
 
                             if (regexMatch.Success) {
@@ -105,20 +104,23 @@ namespace SteamScreenshotDownloader {
 
                                 // Underscores are used as folder separators, except the last one, which splits the date & time values
                                 var lastUnderscore = fullFilename.LastIndexOf('_');
-                                fullFilename = fullFilename.Substring(0, lastUnderscore).Replace('_', '\\') + fullFilename.Substring(lastUnderscore, fullFilename.Length - lastUnderscore);
+                                fullFilename = fullFilename[..lastUnderscore].Replace('_', '\\') + fullFilename.Substring(lastUnderscore, fullFilename.Length - lastUnderscore);
                                 fullFilename = fullFilename.Replace("screenshots", "");
                                 var lastSlash = fullFilename.LastIndexOf('\\');
-                                fullFilename = fullFilename.Substring(0, lastSlash - 1);
+                                fullFilename = fullFilename[..(lastSlash - 1)];
                                 screenshot.ScreenshotFilename = fullFilename + @"\" + screenshot.FileId + ".jpg";
                             } else {
                                 screenshot.ScreenshotFilename = screenshot.FileId + ".jpg";
                             }
                         }
+                    }
 
-                        var screenshotFilename = screenshot.ScreenshotFilename;
-                        if (string.IsNullOrEmpty(screenshotFilename)) {
-                            screenshotFilename = screenshot.FileId + ".jpg";
-                        }
+                    var screenshotFilename = screenshot.ScreenshotFilename;
+                    if (string.IsNullOrEmpty(screenshotFilename)) {
+                        screenshotFilename = screenshot.FileId + ".jpg";
+                    }
+
+                    if (BaseDirectory != null) {
                         var fullScreenshotFilePath = Path.Combine(BaseDirectory, screenshotFilename);
                         var fullScreenshotDirectoryPath = Path.GetDirectoryName(fullScreenshotFilePath);
 
@@ -126,14 +128,13 @@ namespace SteamScreenshotDownloader {
                             Directory.CreateDirectory(fullScreenshotDirectoryPath ?? throw new InvalidOperationException());
                         }
 
-                        using (var fileStream = new FileStream(fullScreenshotFilePath, FileMode.Create)) {
-                            Console.WriteLine("[" + index.ToString().PadLeft(digit, '0') + "/" + total + "] Saving screenshot {0}", screenshot.FileId);
-                            stream?.CopyTo(fileStream);
-                        }
-
-                        index++;
+                        using var fileStream = new FileStream(fullScreenshotFilePath, FileMode.Create);
+                        Console.WriteLine("[" + index.ToString().PadLeft(digit, '0') + "/" + total + "] Saving screenshot {0}", screenshot.FileId);
+                        stream.CopyTo(fileStream);
                     }
                 }
+
+                index++;
 
                 /*if (string.IsNullOrWhiteSpace(screenshot.ThumbnailUrl)) {
                     Console.ForegroundColor = ConsoleColor.Red;
@@ -145,7 +146,6 @@ namespace SteamScreenshotDownloader {
                 var thumbnailWebRequest = WebRequest.Create(screenshot.ThumbnailUrl) as HttpWebRequest;
 
                 using (var response = TryGetResponse(thumbnailWebRequest)) {
-                    //   TODO: Handle null responses...
                     if (response == null) continue;
                     using (var stream = response.GetResponseStream()) {
                         if (response.Headers.AllKeys.Any(x => x.Equals("Content-Disposition", StringComparison.OrdinalIgnoreCase))) {
@@ -181,6 +181,7 @@ namespace SteamScreenshotDownloader {
             }
         }
 
+        [Obsolete("Obsolete")]
         private static List<SteamScreenshot> GetFileIdAndThumbnails(List<SteamScreenshot> screenshots, string steamId, int pageNo) {
             var requestScreenshots = new List<SteamScreenshot>();
 
@@ -193,7 +194,6 @@ namespace SteamScreenshotDownloader {
                 GC.Collect();
                 var webRequest = WebRequest.Create(url) as HttpWebRequest;
                 var response = webRequest?.GetResponse();
-                // TODO: Handle null responses...
                 var stream = response?.GetResponseStream();
                 var streamReader = new StreamReader(stream ?? throw new InvalidOperationException());
                 var html = streamReader.ReadToEnd();
@@ -222,32 +222,31 @@ namespace SteamScreenshotDownloader {
             return screenshots;
         }
 
-        private static string GetFileActualUrl(double fileId) {
+        [Obsolete("Obsolete")]
+        private static string? GetFileActualUrl(double fileId) {
             const string fileDetailUrlFormat = "https://steamcommunity.com/sharedfiles/filedetails/?id={0}";
             const string actualUrlPattern = @"href="".*?ugc.*?""";
 
             var fileDetailUrl = string.Format(fileDetailUrlFormat, fileId);
 
-            var webRequest = WebRequest.Create(fileDetailUrl) as HttpWebRequest;
+            if (WebRequest.Create(fileDetailUrl) is HttpWebRequest webRequest) {
+                using var response = TryGetResponse(webRequest);
+                using var stream = response.GetResponseStream();
+                using var streamReader = new StreamReader(stream ?? throw new InvalidOperationException());
+                var html = streamReader.ReadToEnd();
 
-            using (var response = TryGetResponse(webRequest)) {
-                // TODO: Handle null responses...
-                if (response == null) return null;
-                using (var stream = response.GetResponseStream())
-                using (var streamReader = new StreamReader(stream ?? throw new InvalidOperationException())) {
-                    var html = streamReader.ReadToEnd();
+                var actualFileUrlMatches = Regex.Matches(html, actualUrlPattern, RegexOptions.IgnoreCase);
 
-                    var actualFileUrlMatches = Regex.Matches(html, actualUrlPattern, RegexOptions.IgnoreCase);
+                if (actualFileUrlMatches.Count <= 0) return null;
+                var match = actualFileUrlMatches[1];
+                var value = match.Value.Replace("href=", "").Replace("\"", "").Trim();
 
-                    if (actualFileUrlMatches.Count <= 0) return null;
-                    var match = actualFileUrlMatches[1];
-                    var value = match.Value.Replace("href=", "").Replace("\"", "").Trim();
+                Console.WriteLine("Found screenshot url for File Id: {0}", fileId);
 
-                    Console.WriteLine("Found screenshot url for File Id: {0}", fileId);
-
-                    return value;
-                }
+                return value;
             }
+
+            return null;
         }
     }
 }
