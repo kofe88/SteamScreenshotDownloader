@@ -1,6 +1,5 @@
 ﻿using System.Diagnostics;
 using System.Net;
-using System.Reflection;
 using System.Text.RegularExpressions;
 
 namespace SteamScreenshotDownloader {
@@ -40,7 +39,7 @@ namespace SteamScreenshotDownloader {
                     index++;
                 }
 
-                BaseDirectory = Path.Combine(Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location) ?? throw new InvalidOperationException(), steamId);
+                BaseDirectory = Path.Combine(Path.GetDirectoryName(AppContext.BaseDirectory) ?? throw new InvalidOperationException(), steamId);
 
                 Console.WriteLine("\nStart Saving...");
                 Console.WriteLine("Saving to {0}", BaseDirectory);
