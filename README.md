@@ -1,6 +1,6 @@
 # Steam Screenshot Downloader
 
-![](https://img.shields.io/badge/.Net-6.0-lightgrey?style=for-the-badge&logo=windows)&ensp;
+![](https://img.shields.io/badge/.Net-7.0-lightgrey?style=for-the-badge&logo=windows)&ensp;
 [![](https://img.shields.io/github/v/release/lzcapp/SteamScreenshotDownloader?style=for-the-badge)](https://github.com/lzcapp/SteamScreenshotDownloader/releases/latest)
 
 A Windows console application that downloads all (public) screenshots for the specified Steam account.
